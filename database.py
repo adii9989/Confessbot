@@ -1,9 +1,11 @@
 # This is database.py
 import pymongo 
+from datetime import datetime, timezone
 
-# --- Guild Configuration (Confession Channel) ---
+# --- Guild/Channel Configuration ---
+
 async def set_confession_channel(db, guild_id, channel_id):
-    """Sets the confession channel for a guild."""
+    """Registers the main confession channel for a guild."""
     await db.guild_config.update_one(
         {"_id": guild_id},
         {"$set": {"channel_id": channel_id}},
@@ -11,22 +13,28 @@ async def set_confession_channel(db, guild_id, channel_id):
     )
 
 async def get_confession_channel(db, guild_id):
-    """Gets the confession channel config for a guild."""
+    """Gets the configured confession channel for a guild."""
     return await db.guild_config.find_one({"_id": guild_id})
 
+async def is_confession_channel(db, channel_id):
+    """Checks if a channel ID is registered as a confession channel."""
+    doc = await db.guild_config.find_one({"channel_id": channel_id})
+    return doc is not None
+
 # --- Confession Index (Counter) ---
-async def set_confession_index(db, guild_id, number):
-    """Sets the confession counter. The next confession will be this number."""
-    await db.guild_counters.update_one(
-        {"_id": guild_id},
+
+async def set_confession_index(db, channel_id, number):
+    """Sets the confession counter for a SPECIFIC CHANNEL."""
+    await db.channel_counters.update_one(
+        {"_id": channel_id},
         {"$set": {"index": number - 1}},
         upsert=True
     )
 
-async def get_next_confession_index(db, guild_id):
+async def get_next_confession_index(db, channel_id):
     """Increments and returns the next confession index."""
-    result = await db.guild_counters.find_one_and_update(
-        {"_id": guild_id},
+    result = await db.channel_counters.find_one_and_update(
+        {"_id": channel_id},
         {"$inc": {"index": 1}},
         upsert=True,
         return_document=pymongo.ReturnDocument.AFTER
@@ -34,10 +42,11 @@ async def get_next_confession_index(db, guild_id):
     return result.get("index", 1) 
 
 # --- Log Channel Configuration ---
-async def set_log_channel(db, guild_id, target_guild_id, target_channel_id):
-    """Sets the cross-server logging destination."""
+
+async def set_log_channel(db, source_channel_id, target_guild_id, target_channel_id):
+    """Maps a SOURCE confession channel to a TARGET log channel."""
     await db.log_config.update_one(
-        {"_id": guild_id},
+        {"_id": source_channel_id},
         {"$set": {
             "target_guild_id": target_guild_id,
             "target_channel_id": target_channel_id
@@ -45,20 +54,41 @@ async def set_log_channel(db, guild_id, target_guild_id, target_channel_id):
         upsert=True
     )
 
-async def get_log_channel(db, guild_id):
+async def get_log_channel(db, source_channel_id):
     """Gets the log channel destination."""
-    return await db.log_config.find_one({"_id": guild_id})
+    return await db.log_config.find_one({"_id": source_channel_id})
 
-# --- Confession Index Mapping (UPDATED) ---
 
-async def save_confession_map(db, guild_id, index, channel_id, message_id, type):
-    """Saves the mapping of confession index, message details, and type."""
+# --- Confession Mapping & Backup ---
+
+async def save_confession_map(db, main_channel_id, index, actual_channel_id, message_id, type_):
+    """Saves the mapping of index -> message ID."""
     await db.confession_map.update_one(
-        {"guild_id": guild_id, "index": index},
-        {"$set": {"channel_id": channel_id, "message_id": message_id, "type": type}}, # <-- Saves 'type'
+        {"channel_id": main_channel_id, "index": index},
+        {
+            "$set": {
+                "actual_channel_id": actual_channel_id, 
+                "message_id": message_id, 
+                "type": type_
+            }
+        },
         upsert=True
     )
 
-async def get_confession_map(db, guild_id, index):
-    """Retrieves the mapping of confession index to message details."""
-    return await db.confession_map.find_one({"guild_id": guild_id, "index": index})
+async def get_confession_map(db, main_channel_id, index):
+    """Retrieves message details by main channel and index."""
+    return await db.confession_map.find_one({"channel_id": main_channel_id, "index": index})
+
+async def save_full_confession_log(db, channel_id, index, user_id, content, attachment_url):
+    """Saves the FULL content and AUTHOR of a confession."""
+    # --- FIX: Use Python datetime instead of Mongo command ---
+    await db.full_logs.insert_one({
+        "channel_id": channel_id,
+        "index": index,
+        "user_id": user_id,
+        "content": content,
+        "attachment_url": attachment_url,
+        "timestamp": datetime.now(timezone.utc)
+    })
+
+
