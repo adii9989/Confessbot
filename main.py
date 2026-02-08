@@ -6,6 +6,15 @@ import threading  # <-- Add this
 from flask import Flask  # <-- Add this
 from discord.ext import commands
 
+import logging
+
+# --- DEBUG LOGGING START ---
+logging.basicConfig(level=logging.DEBUG)
+# --- DEBUG LOGGING END ---
+
+# Your bot code continues below...
+# bot = commands.Bot(...)
+
 # --- Flask Web App Setup ---
 # This part keeps Koyeb's free tier alive
 app = Flask(__name__)
