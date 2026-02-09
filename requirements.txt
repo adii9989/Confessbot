@@ -2,6 +2,5 @@ discord.py
 motor 
 pymongo
 Flask
-python-dotenv
-dnspython
+
 
