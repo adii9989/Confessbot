@@ -7,6 +7,28 @@ from flask import Flask  # <-- Add this
 from discord.ext import commands
 
 import logging
+from dotenv import load_dotenv
+
+# 1. Load variables from .env file (for local testing or hosts that use .env files)
+load_dotenv()
+
+# 2. Retrieve the secrets
+TOKEN = os.getenv("DISCORD_TOKEN")
+MONGO_URI = os.getenv("MONGO_URI")
+
+# 3. Optional: Check if they exist to prevent crashing later
+if not TOKEN or not MONGO_URI:
+    print("Error: DISCORD_TOKEN or MONGO_URI is missing from environment variables.")
+    # You might want to exit here if they are critical
+    # exit(1)
+
+# --- Your Bot Code Below ---
+
+# Example usage:
+# client.run(TOKEN)
+# cluster = MongoClient(MONGO_URI) 
+
+
 
 # --- DEBUG LOGGING START ---
 logging.basicConfig(level=logging.DEBUG)
